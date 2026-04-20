@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { View, ScrollView, StyleSheet, TextInput, Alert, Linking } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../src/hooks/useTheme';
 import { spacing, font, radius } from '../../src/lib/theme';
@@ -16,6 +16,7 @@ function maskKey(k) {
 
 export default function SettingsScreen() {
   const { c } = useTheme();
+  const router = useRouter();
   const [savedKey, setSavedKey] = useState(null);
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState('');
@@ -118,6 +119,14 @@ export default function SettingsScreen() {
             </View>
           </View>
         )}
+      </ListSection>
+
+      <ListSection title="Taggar">
+        <ListRow
+          title="Hantera taggar"
+          subtitle="Skapa och ta bort taggar för personer och kategorier"
+          onPress={() => router.push('/tags/manage')}
+        />
       </ListSection>
 
       <ListSection title="Om" footer={`Kvittoappen · version ${require('../../app.json').expo.version}`}>

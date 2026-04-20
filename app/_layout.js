@@ -74,6 +74,14 @@ export default function RootLayout() {
             name="tags/pick"
             options={{ title: 'Taggar' }}
           />
+          <Stack.Screen
+            name="tags/manage"
+            options={{ title: 'Taggar', headerBackTitle: 'Tillbaka' }}
+          />
+          <Stack.Screen
+            name="inbox"
+            options={{ title: 'Inbox', headerBackTitle: 'Resor' }}
+          />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

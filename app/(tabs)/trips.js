@@ -3,8 +3,8 @@ import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from 'rea
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
-import { spacing, font, shadow } from '../../src/lib/theme';
-import { listTrips } from '../../src/lib/db';
+import { spacing, font, radius, shadow } from '../../src/lib/theme';
+import { listTrips, countInboxReceipts } from '../../src/lib/db';
 import { formatSEK } from '../../src/lib/fx';
 import { EmptyState } from '../../src/components/EmptyState';
 import { Button } from '../../src/components/Button';
@@ -13,12 +13,14 @@ export default function TripsScreen() {
   const { c } = useTheme();
   const router = useRouter();
   const [trips, setTrips] = useState([]);
+  const [inboxCount, setInboxCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const rows = await listTrips();
+      const [rows, count] = await Promise.all([listTrips(), countInboxReceipts()]);
       setTrips(rows);
+      setInboxCount(count);
     } catch (e) {
       console.warn('load trips', e);
     }
@@ -70,12 +72,39 @@ export default function TripsScreen() {
     );
   };
 
+  const inboxHeader = inboxCount > 0 ? (
+    <Pressable
+      onPress={() => router.push('/inbox')}
+      accessibilityRole="button"
+      accessibilityLabel={`Inbox, ${inboxCount} kvitton utan resa`}
+      style={({ pressed }) => [
+        styles.inboxRow,
+        shadow.card,
+        { backgroundColor: c.card, opacity: pressed ? 0.7 : 1 },
+      ]}
+    >
+      <View style={[styles.inboxIcon, { backgroundColor: c.bg }]}>
+        <Ionicons name="file-tray-outline" size={22} color={c.accent} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[font.body, { color: c.text, fontWeight: '600' }]}>
+          {inboxCount} {inboxCount === 1 ? 'kvitto' : 'kvitton'} utan resa
+        </Text>
+        <Text style={[font.footnote, { color: c.textSecondary, marginTop: 2 }]}>
+          Otilldelade kvitton
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
+    </Pressable>
+  ) : null;
+
   return (
     <View style={[styles.container, { backgroundColor: c.bg }]}>
       <FlatList
         data={trips}
         keyExtractor={(it) => String(it.id)}
         renderItem={renderItem}
+        ListHeaderComponent={inboxHeader}
         contentContainerStyle={trips.length === 0 ? styles.emptyWrap : styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.textSecondary} />}
         ListEmptyComponent={
@@ -128,6 +157,18 @@ const styles = StyleSheet.create({
     right: spacing.lg,
     bottom: spacing.lg,
     width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  inboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  inboxIcon: {
+    width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
   },
 });

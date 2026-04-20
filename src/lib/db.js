@@ -137,6 +137,12 @@ export async function listInboxReceipts() {
   `);
 }
 
+export async function countInboxReceipts() {
+  const db = await getDB();
+  const row = await db.getFirstAsync('SELECT COUNT(*) AS count FROM receipts WHERE trip_id IS NULL');
+  return row?.count || 0;
+}
+
 export async function listAllReceipts() {
   const db = await getDB();
   return db.getAllAsync(`

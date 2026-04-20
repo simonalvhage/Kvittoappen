@@ -29,18 +29,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="index"
+        name="stats"
         options={{
-          title: 'Kvitton',
-          tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" color={color} size={size} />,
-          headerLargeTitle: true,
-        }}
-      />
-      <Tabs.Screen
-        name="tags"
-        options={{
-          title: 'Taggar',
-          tabBarIcon: ({ color, size }) => <Ionicons name="pricetag-outline" color={color} size={size} />,
+          title: 'Stats',
+          tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen

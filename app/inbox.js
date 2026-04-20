@@ -5,12 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
-import { useTheme } from '../../src/hooks/useTheme';
-import { spacing, font, shadow, radius } from '../../src/lib/theme';
-import { listAllReceipts, deleteReceipt } from '../../src/lib/db';
-import { formatSEK, formatMoney } from '../../src/lib/fx';
-import { EmptyState } from '../../src/components/EmptyState';
-import { Button } from '../../src/components/Button';
+import { useTheme } from '../src/hooks/useTheme';
+import { spacing, font, shadow, radius } from '../src/lib/theme';
+import { listAllReceipts, deleteReceipt } from '../src/lib/db';
+import { formatSEK, formatMoney } from '../src/lib/fx';
+import { EmptyState } from '../src/components/EmptyState';
+import { Button } from '../src/components/Button';
 
 export default function InboxScreen() {
   const { c } = useTheme();

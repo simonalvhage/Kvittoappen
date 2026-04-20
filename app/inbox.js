@@ -130,19 +130,24 @@ export default function InboxScreen() {
     );
   };
 
-  const renderRightActions = (id) => () => (
-    <Pressable
-      onPress={() => deleteOne(id)}
-      accessibilityLabel="Ta bort kvitto"
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.swipeDelete,
-        { backgroundColor: c.danger, opacity: pressed ? 0.85 : 1 },
-      ]}
-    >
-      <Ionicons name="trash" size={22} color="#fff" />
-    </Pressable>
-  );
+  const renderRightActions = (id) => {
+    function RightActions() {
+      return (
+        <Pressable
+          onPress={() => deleteOne(id)}
+          accessibilityLabel="Ta bort kvitto"
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.swipeDelete,
+            { backgroundColor: c.danger, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Ionicons name="trash" size={22} color="#fff" />
+        </Pressable>
+      );
+    }
+    return RightActions;
+  };
 
   const renderItem = ({ item }) => {
     const sekValue = item.total_sek ?? item.total;
@@ -169,6 +174,9 @@ export default function InboxScreen() {
           onPress={onPress}
           onLongPress={onLongPress}
           delayLongPress={280}
+          accessibilityRole="button"
+          accessibilityLabel={`${item.store || 'Okänd butik'}, ${Math.round(sekValue || 0)} kronor`}
+          accessibilityHint="Dra åt vänster för att ta bort, eller håll in för att välja flera"
           style={({ pressed }) => [
             styles.row,
             { backgroundColor: c.card, opacity: pressed ? 0.7 : 1 },

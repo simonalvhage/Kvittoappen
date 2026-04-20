@@ -95,19 +95,24 @@ export default function TagsScreen() {
     );
   };
 
-  const renderRightActions = (tag) => () => (
-    <Pressable
-      onPress={() => confirmDelete(tag)}
-      accessibilityLabel={`Ta bort tagg ${tag.name}`}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.swipeDelete,
-        { backgroundColor: c.danger, opacity: pressed ? 0.85 : 1 },
-      ]}
-    >
-      <Ionicons name="trash" size={22} color="#fff" />
-    </Pressable>
-  );
+  const renderRightActions = (tag) => {
+    function RightActions() {
+      return (
+        <Pressable
+          onPress={() => confirmDelete(tag)}
+          accessibilityLabel={`Ta bort tagg ${tag.name}`}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.swipeDelete,
+            { backgroundColor: c.danger, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Ionicons name="trash" size={22} color="#fff" />
+        </Pressable>
+      );
+    }
+    return RightActions;
+  };
 
   const renderItem = ({ item }) => {
     const count = counts.get(item.id) || 0;
@@ -118,15 +123,27 @@ export default function TagsScreen() {
         overshootRight={false}
         renderRightActions={renderRightActions(item)}
       >
-        <View style={[styles.row, { backgroundColor: c.card }]}>
-          <View style={[styles.dot, { backgroundColor: item.color }]} />
+        <Pressable
+          onLongPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            confirmDelete(item);
+          }}
+          delayLongPress={400}
+          accessibilityRole="button"
+          accessibilityLabel={`Tagg ${item.name}, ${count} ${count === 1 ? 'kvitto' : 'kvitton'}`}
+          accessibilityHint="Dra åt vänster eller håll in för att ta bort"
+          style={[styles.row, { backgroundColor: c.card }]}
+        >
+          <View style={[styles.dot, { backgroundColor: item.color }]}>
+            <Text style={styles.dotInitial}>{item.name.slice(0, 1).toUpperCase()}</Text>
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>{item.name}</Text>
             <Text style={[styles.meta, { color: c.textSecondary }]}>
               {count} {count === 1 ? 'kvitto' : 'kvitton'}
             </Text>
           </View>
-        </View>
+        </Pressable>
       </ReanimatedSwipeable>
     );
   };
@@ -167,7 +184,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: 60,
   },
-  dot: { width: 24, height: 24, borderRadius: 12 },
+  dot: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  dotInitial: { ...font.caption, color: '#fff', fontWeight: '700' },
   name: { ...font.body, fontWeight: '600' },
   meta: { ...font.footnote, marginTop: 2 },
   swipeDelete: {

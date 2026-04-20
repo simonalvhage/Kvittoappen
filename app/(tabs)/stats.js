@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-nat
 import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../src/hooks/useTheme';
 import { spacing, font, radius, shadow } from '../../src/lib/theme';
-import { statsOverall, statsMonthly, statsByStore, statsTopTags } from '../../src/lib/db';
+import { statsOverall, statsMonthly, statsByStore, statsTopTags, statsTopPersons } from '../../src/lib/db';
 import { formatSEK } from '../../src/lib/fx';
 import { EmptyState } from '../../src/components/EmptyState';
 
@@ -29,20 +29,23 @@ export default function StatsScreen() {
   const [monthly, setMonthly] = useState([]);
   const [stores, setStores] = useState([]);
   const [topTags, setTopTags] = useState([]);
+  const [topPersons, setTopPersons] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [o, m, s, t] = await Promise.all([
+      const [o, m, s, t, p] = await Promise.all([
         statsOverall(),
         statsMonthly(),
         statsByStore(),
         statsTopTags(5),
+        statsTopPersons(5),
       ]);
       setOverall(o);
       setMonthly(m);
       setStores(s.slice(0, 5));
       setTopTags(t);
+      setTopPersons(p);
     } catch (e) {
       console.warn('stats load', e);
     } finally {
@@ -160,9 +163,45 @@ export default function StatsScreen() {
         </View>
       ) : null}
 
+      {topPersons.length > 0 ? (
+        <View style={{ marginTop: spacing.lg }}>
+          <Text style={[styles.sectionHeader, { color: c.textSecondary }]}>PER PERSON</Text>
+          <View style={[styles.card, { backgroundColor: c.card }]}>
+            {topPersons.map((p, i) => (
+              <View key={p.id}>
+                <View style={styles.row}>
+                  <View style={[styles.avatar, { backgroundColor: p.color }]}>
+                    <Text style={{ ...font.footnote, color: '#fff', fontWeight: '700' }}>
+                      {p.name.slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[font.body, { color: c.text, fontWeight: '600' }]} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    <Text style={[font.footnote, { color: c.textSecondary, marginTop: 2 }]}>
+                      {p.receipt_count} {p.receipt_count === 1 ? 'kvitto' : 'kvitton'}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[font.body, { color: c.text, fontWeight: '600' }]}
+                    accessibilityLabel={`${p.name}: ${Math.round(p.total)} kronor`}
+                  >
+                    {formatSEK(p.total)}
+                  </Text>
+                </View>
+                {i < topPersons.length - 1 ? (
+                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.separator, marginLeft: 60 }} />
+                ) : null}
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       {topTags.length > 0 ? (
         <View style={{ marginTop: spacing.lg }}>
-          <Text style={[styles.sectionHeader, { color: c.textSecondary }]}>TOPP 5 TAGGAR</Text>
+          <Text style={[styles.sectionHeader, { color: c.textSecondary }]}>TOPP 5 KATEGORIER</Text>
           <View style={[styles.card, { backgroundColor: c.card }]}>
             {topTags.map((t, i) => (
               <View key={t.id}>

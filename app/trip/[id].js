@@ -10,7 +10,7 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { spacing, font, radius, shadow } from '../../src/lib/theme';
 import {
   getTrip, listReceiptsByTrip, deleteTrip,
-  getTripTagTotals, getTripDailyTotals, getTripStoreStats,
+  getTripTagTotals, getTripDailyTotals, getTripStoreStats, getTripPersonTotals,
 } from '../../src/lib/db';
 import { formatSEK } from '../../src/lib/fx';
 import { EmptyState } from '../../src/components/EmptyState';
@@ -35,6 +35,7 @@ export default function TripDetail() {
   const [trip, setTrip] = useState(null);
   const [receipts, setReceipts] = useState([]);
   const [tagTotals, setTagTotals] = useState({ tags: [], untagged: 0 });
+  const [personTotals, setPersonTotals] = useState([]);
   const [dailyTotals, setDailyTotals] = useState([]);
   const [storeStats, setStoreStats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,14 +45,16 @@ export default function TripDetail() {
     const t = await getTrip(id);
     setTrip(t);
     if (t) {
-      const [rs, tt, dt, ss] = await Promise.all([
+      const [rs, tt, pt, dt, ss] = await Promise.all([
         listReceiptsByTrip(id),
         getTripTagTotals(id),
+        getTripPersonTotals(id),
         getTripDailyTotals(id),
         getTripStoreStats(id),
       ]);
       setReceipts(rs);
       setTagTotals(tt);
+      setPersonTotals(pt);
       setDailyTotals(dt);
       setStoreStats(ss);
     }
@@ -102,6 +105,7 @@ export default function TripDetail() {
     { value: 'overview', label: 'Översikt' },
     { value: 'days', label: 'Dagar' },
     { value: 'people', label: 'Personer' },
+    { value: 'categories', label: 'Kategorier' },
     { value: 'stores', label: 'Butiker' },
   ];
 
@@ -160,6 +164,15 @@ export default function TripDetail() {
           )}
           {segment === 'people' && (
             <PeopleView
+              personTotals={personTotals}
+              total={total}
+              tripId={id}
+              c={c}
+              router={router}
+            />
+          )}
+          {segment === 'categories' && (
+            <CategoriesView
               tagTotals={tagTotals}
               total={total}
               tripId={id}
@@ -458,39 +471,34 @@ function DaysView({ trip, receipts, dailyTotals, c, router }) {
   );
 }
 
-function PeopleView({ tagTotals, total, tripId, c, router }) {
-  const rows = [
-    ...tagTotals.tags.map((t) => ({
-      id: t.id,
-      name: t.name,
-      color: t.color,
-      total: t.total,
-      shared: t.shared || 0,
-      receiptCount: t.receipt_count || 0,
-      navigable: true,
-    })),
-    ...(tagTotals.untagged > 0
-      ? [{ id: null, name: 'Otaggat', color: c.textTertiary, total: tagTotals.untagged, shared: 0, receiptCount: 0, navigable: false }]
-      : []),
-  ];
+function PeopleView({ personTotals, total, tripId, c, router }) {
+  const rows = personTotals.map((p) => ({
+    id: p.id,
+    name: p.name,
+    color: p.color,
+    total: p.total || 0,
+    shared: p.shared || 0,
+    receiptCount: p.receipt_count || 0,
+    navigable: true,
+  }));
 
   if (rows.length === 0) {
     return (
       <EmptyState
         icon="people-outline"
-        title="Inga taggar än"
-        message="Lägg till taggar på dina kvitton för att se vem som köpt vad."
+        title="Inga personer än"
+        message="Tilldela personer till dina kvitton för att se vem som handlat vad."
       >
         <Pressable
-          onPress={() => router.push('/tags/manage')}
+          onPress={() => router.push('/persons/manage')}
           accessibilityRole="button"
-          accessibilityLabel="Hantera taggar"
+          accessibilityLabel="Hantera personer"
           style={({ pressed }) => [
             styles.primaryBtn,
             { backgroundColor: c.accent, opacity: pressed ? 0.85 : 1 },
           ]}
         >
-          <Text style={{ ...font.headline, color: '#fff' }}>Hantera taggar</Text>
+          <Text style={{ ...font.headline, color: '#fff' }}>Hantera personer</Text>
         </Pressable>
       </EmptyState>
     );
@@ -517,6 +525,102 @@ function PeopleView({ tagTotals, total, tripId, c, router }) {
                 <Text style={[font.footnote, { color: c.textSecondary, marginTop: 2 }]}>
                   {pct}% av resan
                   {r.shared > 0 ? ` · varav ${formatSEK(r.shared)} delat` : ''}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text
+                  style={[font.title3, { color: c.text }]}
+                  accessibilityLabel={`${r.name}: ${Math.round(r.total)} kronor`}
+                >
+                  {formatSEK(r.total)}
+                </Text>
+                {r.navigable ? (
+                  <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
+                ) : null}
+              </View>
+            </View>
+            <View style={[styles.progressTrack, { backgroundColor: c.separator }]}>
+              <View style={{ width: `${pct}%`, height: '100%', backgroundColor: r.color }} />
+            </View>
+          </View>
+        );
+
+        if (!r.navigable) return <View key={String(r.id)}>{content}</View>;
+
+        return (
+          <Pressable
+            key={String(r.id)}
+            onPress={() => router.push(`/trip/${tripId}/person/${r.id}`)}
+            accessibilityRole="button"
+            accessibilityLabel={`${r.name}, se detaljer`}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            {content}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function CategoriesView({ tagTotals, total, tripId, c, router }) {
+  const rows = [
+    ...tagTotals.tags.map((t) => ({
+      id: t.id,
+      name: t.name,
+      color: t.color,
+      total: t.total,
+      shared: t.shared || 0,
+      receiptCount: t.receipt_count || 0,
+      navigable: true,
+    })),
+    ...(tagTotals.untagged > 0
+      ? [{ id: null, name: 'Okategoriserat', color: c.textTertiary, total: tagTotals.untagged, shared: 0, receiptCount: 0, navigable: false }]
+      : []),
+  ];
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        icon="pricetag-outline"
+        title="Inga kategorier än"
+        message="Lägg till kategorier på dina kvitton för att se spenderingar per område."
+      >
+        <Pressable
+          onPress={() => router.push('/tags/manage')}
+          accessibilityRole="button"
+          accessibilityLabel="Hantera kategorier"
+          style={({ pressed }) => [
+            styles.primaryBtn,
+            { backgroundColor: c.accent, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Text style={{ ...font.headline, color: '#fff' }}>Hantera kategorier</Text>
+        </Pressable>
+      </EmptyState>
+    );
+  }
+
+  const base = total || rows.reduce((s, r) => s + r.total, 0) || 1;
+
+  return (
+    <View style={{ gap: spacing.md }}>
+      {rows.map((r) => {
+        const pct = Math.round((r.total / base) * 100);
+        const content = (
+          <View style={[styles.sectionCard, { backgroundColor: c.card, gap: spacing.sm }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <View style={[styles.personAvatar, { backgroundColor: r.color }]}>
+                <Text style={{ ...font.headline, color: '#fff' }}>
+                  {r.name.slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[font.body, { color: c.text, fontWeight: '600' }]} numberOfLines={1}>
+                  {r.name}
+                </Text>
+                <Text style={[font.footnote, { color: c.textSecondary, marginTop: 2 }]}>
+                  {pct}% av resan
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>

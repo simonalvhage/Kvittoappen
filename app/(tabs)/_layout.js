@@ -7,7 +7,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
-      initialRouteName="trips"
+      initialRouteName="feed"
       screenOptions={{
         tabBarActiveTintColor: c.accent,
         tabBarInactiveTintColor: c.textSecondary,
@@ -22,10 +22,10 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="trips"
+        name="feed"
         options={{
-          title: 'Resor',
-          tabBarIcon: ({ color, size }) => <Ionicons name="airplane-outline" color={color} size={size} />,
+          title: 'Flöde',
+          tabBarIcon: ({ color, size }) => <Ionicons name="reader-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen

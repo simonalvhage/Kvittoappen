@@ -9,6 +9,7 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { spacing, font, radius } from '../../src/lib/theme';
 import {
   getReceipt, getReceiptItems, setReceiptSplit, deleteReceipt, getTrip, getReceiptTags,
+  getReceiptPersons, hasItemLevelSplit,
 } from '../../src/lib/db';
 import { formatSEK, formatMoney } from '../../src/lib/fx';
 
@@ -21,6 +22,8 @@ export default function ReceiptDetail() {
   const [items, setItems] = useState([]);
   const [trip, setTrip] = useState(null);
   const [tags, setTags] = useState([]);
+  const [people, setPeople] = useState([]);
+  const [itemSplit, setItemSplit] = useState(false);
   const [splitCount, setSplitCount] = useState(1);
 
   const load = useCallback(async () => {
@@ -28,9 +31,16 @@ export default function ReceiptDetail() {
     if (!r) return;
     setReceipt(r);
     setSplitCount(r.split_count || 1);
-    const [its, ts] = await Promise.all([getReceiptItems(id), getReceiptTags(id)]);
+    const [its, ts, ps, itemFlag] = await Promise.all([
+      getReceiptItems(id),
+      getReceiptTags(id),
+      getReceiptPersons(id),
+      hasItemLevelSplit(id),
+    ]);
     setItems(its);
     setTags(ts);
+    setPeople(ps);
+    setItemSplit(itemFlag);
     if (r.trip_id) {
       const t = await getTrip(r.trip_id);
       setTrip(t);
@@ -118,6 +128,53 @@ export default function ReceiptDetail() {
         </View>
 
         <Pressable
+          onPress={() => router.push({ pathname: `/receipt/${id}/people` })}
+          accessibilityRole="button"
+          accessibilityLabel={people.length === 0 ? 'Lägg till personer' : `Personer: ${people.map((p) => p.name).join(', ')}`}
+          style={({ pressed }) => [
+            styles.card, styles.tripRow,
+            { backgroundColor: c.card, opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Ionicons name="people-outline" size={20} color={c.accent} />
+          <View style={{ flex: 1 }}>
+            {people.length === 0 ? (
+              <Text style={[font.body, { color: c.text, fontWeight: '600' }]}>Lägg till personer</Text>
+            ) : (
+              <>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {people.map((p) => (
+                    <View key={p.id} style={[styles.personChip, { backgroundColor: p.color }]}>
+                      <Text style={[font.caption, { color: '#fff', fontWeight: '700' }]}>
+                        {p.name.slice(0, 1).toUpperCase()}
+                      </Text>
+                      <Text style={[font.footnote, { color: '#fff', fontWeight: '600' }]}>
+                        {p.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.push({ pathname: `/receipt/${id}/people` });
+                  }}
+                >
+                  <Text style={[font.footnote, { color: c.textSecondary, marginTop: 6 }]}>
+                    {itemSplit
+                      ? 'Uppdelad per vara · tryck för att ändra'
+                      : people.length === 1
+                        ? 'Hela kvittot'
+                        : `Delat lika på ${people.length} personer`}
+                  </Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
+        </Pressable>
+
+        <Pressable
           onPress={() => router.push(`/assign/${receipt.id}`)}
           style={({ pressed }) => [
             styles.card, styles.tripRow,
@@ -149,7 +206,7 @@ export default function ReceiptDetail() {
           <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {tags.length === 0 ? (
               <Text style={[font.body, { color: c.text, fontWeight: '600' }]}>
-                Lägg till taggar
+                Lägg till kategorier
               </Text>
             ) : (
               tags.map((t) => (
@@ -300,6 +357,15 @@ const styles = StyleSheet.create({
   },
   tagChip: {
     paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  personChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 4,
+    paddingRight: 10,
     paddingVertical: 4,
     borderRadius: radius.pill,
   },

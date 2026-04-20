@@ -55,8 +55,8 @@ export default function TagPickScreen() {
 
   const create = () => {
     Alert.prompt(
-      'Ny tagg',
-      'Namn på taggen',
+      'Ny kategori',
+      'Namn på kategorin',
       [
         { text: 'Avbryt', style: 'cancel' },
         {
@@ -68,7 +68,7 @@ export default function TagPickScreen() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
               await load();
             } catch (e) {
-              Alert.alert('Kunde inte skapa tagg', String(e?.message || e));
+              Alert.alert('Kunde inte skapa kategori', String(e?.message || e));
             }
           },
         },
@@ -81,7 +81,7 @@ export default function TagPickScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'Taggar',
+          title: 'Kategorier',
           headerRight: () => (
             <Pressable onPress={done} hitSlop={10} style={{ paddingHorizontal: spacing.md }}>
               <Text style={{ ...font.body, color: c.accent, fontWeight: '600' }}>Klar</Text>
@@ -105,7 +105,7 @@ export default function TagPickScreen() {
                 key={t.id}
                 onPress={() => toggle(t)}
                 accessibilityRole="button"
-                accessibilityLabel={`Tagg ${t.name}`}
+                accessibilityLabel={`Kategori ${t.name}`}
                 accessibilityState={{ selected: isOn }}
                 style={({ pressed }) => [
                   styles.chip,
@@ -147,14 +147,14 @@ export default function TagPickScreen() {
           >
             <Ionicons name="add" size={18} color={c.accent} />
             <Text style={[font.callout, { color: c.accent, fontWeight: '600' }]}>
-              Skapa ny tagg
+              Skapa ny kategori
             </Text>
           </Pressable>
         </View>
 
         {tags.length === 0 ? (
           <Text style={[font.callout, { color: c.textSecondary, textAlign: 'center', marginTop: spacing.xl }]}>
-            Du har inga taggar än. Skapa en första här.
+            Du har inga kategorier än. Skapa en första här.
           </Text>
         ) : null}
       </ScrollView>

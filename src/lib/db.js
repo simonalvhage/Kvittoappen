@@ -75,6 +75,34 @@ async function migrate(db) {
 
     CREATE INDEX IF NOT EXISTS idx_receipt_tags_receipt ON receipt_tags(receipt_id);
     CREATE INDEX IF NOT EXISTS idx_receipt_tags_tag ON receipt_tags(tag_id);
+
+    CREATE TABLE IF NOT EXISTS persons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      color TEXT NOT NULL,
+      is_self INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS receipt_persons (
+      receipt_id INTEGER NOT NULL,
+      person_id INTEGER NOT NULL,
+      PRIMARY KEY (receipt_id, person_id),
+      FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
+      FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS receipt_item_persons (
+      item_id INTEGER NOT NULL,
+      person_id INTEGER NOT NULL,
+      PRIMARY KEY (item_id, person_id),
+      FOREIGN KEY (item_id) REFERENCES receipt_items(id) ON DELETE CASCADE,
+      FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_receipt_persons_receipt ON receipt_persons(receipt_id);
+    CREATE INDEX IF NOT EXISTS idx_receipt_persons_person ON receipt_persons(person_id);
+    CREATE INDEX IF NOT EXISTS idx_receipt_item_persons_item ON receipt_item_persons(item_id);
   `);
 }
 
@@ -150,6 +178,42 @@ export async function listAllReceipts() {
     FROM receipts r LEFT JOIN trips t ON r.trip_id = t.id
     ORDER BY COALESCE(r.purchased_at, r.created_at) DESC
   `);
+}
+
+export async function listFeedReceipts() {
+  const db = await getDB();
+  const receipts = await db.getAllAsync(`
+    SELECT r.*, t.name AS trip_name, t.emoji AS trip_emoji,
+      (SELECT group_concat(p.id || ':' || p.name || ':' || p.color, '|')
+       FROM receipt_persons rp
+       JOIN persons p ON p.id = rp.person_id
+       WHERE rp.receipt_id = r.id) AS persons_raw
+    FROM receipts r LEFT JOIN trips t ON r.trip_id = t.id
+    ORDER BY COALESCE(r.purchased_at, r.created_at) DESC
+  `);
+  return receipts.map((r) => ({
+    ...r,
+    persons: (r.persons_raw || '')
+      .split('|')
+      .filter(Boolean)
+      .map((s) => {
+        const [id, name, color] = s.split(':');
+        return { id: Number(id), name, color };
+      }),
+  }));
+}
+
+export async function sumReceiptsForMonth(year, month) {
+  const db = await getDB();
+  const mStr = String(month).padStart(2, '0');
+  const row = await db.getFirstAsync(
+    `SELECT COALESCE(SUM(COALESCE(total_sek, total, 0)), 0) AS total,
+       COUNT(*) AS count
+     FROM receipts
+     WHERE strftime('%Y-%m', COALESCE(purchased_at, created_at)) = ?`,
+    [`${year}-${mStr}`]
+  );
+  return row || { total: 0, count: 0 };
 }
 
 export async function listReceiptsByTrip(tripId) {
@@ -288,6 +352,147 @@ export async function removeTagFromReceipt(receiptId, tagId) {
   );
 }
 
+// --- Persons ---
+
+export async function listPersons() {
+  const db = await getDB();
+  return db.getAllAsync('SELECT * FROM persons ORDER BY is_self DESC, name COLLATE NOCASE ASC');
+}
+
+export async function ensureSelfPerson() {
+  const db = await getDB();
+  const row = await db.getFirstAsync('SELECT COUNT(*) AS count FROM persons');
+  if ((row?.count || 0) > 0) return;
+  await db.runAsync(
+    'INSERT INTO persons (name, color, is_self) VALUES (?, ?, 1)',
+    ['Jag', TAG_COLORS[0]]
+  );
+}
+
+export async function createPerson(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) throw new Error('Namn saknas');
+  const db = await getDB();
+  const existing = await db.getFirstAsync(
+    'SELECT * FROM persons WHERE name = ? COLLATE NOCASE',
+    [trimmed]
+  );
+  if (existing) return existing;
+  const { count } = await db.getFirstAsync('SELECT COUNT(*) AS count FROM persons');
+  const color = pickTagColor(count);
+  const res = await db.runAsync(
+    'INSERT INTO persons (name, color, is_self) VALUES (?, ?, 0)',
+    [trimmed, color]
+  );
+  return { id: res.lastInsertRowId, name: trimmed, color, is_self: 0 };
+}
+
+export async function updatePerson(id, { name }) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) throw new Error('Namn saknas');
+  const db = await getDB();
+  await db.runAsync('UPDATE persons SET name = ? WHERE id = ?', [trimmed, id]);
+}
+
+export async function deletePerson(id) {
+  const db = await getDB();
+  const row = await db.getFirstAsync('SELECT is_self FROM persons WHERE id = ?', [id]);
+  if (row?.is_self) throw new Error('Kan inte ta bort dig själv');
+  await db.runAsync('DELETE FROM persons WHERE id = ?', [id]);
+}
+
+export async function getReceiptPersons(receiptId) {
+  const db = await getDB();
+  return db.getAllAsync(
+    `SELECT p.* FROM persons p
+     JOIN receipt_persons rp ON rp.person_id = p.id
+     WHERE rp.receipt_id = ?
+     ORDER BY p.is_self DESC, p.name COLLATE NOCASE ASC`,
+    [receiptId]
+  );
+}
+
+export async function setReceiptPersons(receiptId, personIds) {
+  const db = await getDB();
+  await db.runAsync('DELETE FROM receipt_persons WHERE receipt_id = ?', [receiptId]);
+  for (const pid of personIds || []) {
+    await db.runAsync(
+      'INSERT OR IGNORE INTO receipt_persons (receipt_id, person_id) VALUES (?, ?)',
+      [receiptId, pid]
+    );
+  }
+}
+
+export async function getItemPersons(itemId) {
+  const db = await getDB();
+  return db.getAllAsync(
+    `SELECT p.* FROM persons p
+     JOIN receipt_item_persons rip ON rip.person_id = p.id
+     WHERE rip.item_id = ?`,
+    [itemId]
+  );
+}
+
+export async function setItemPersons(itemId, personIds) {
+  const db = await getDB();
+  await db.runAsync('DELETE FROM receipt_item_persons WHERE item_id = ?', [itemId]);
+  for (const pid of personIds || []) {
+    await db.runAsync(
+      'INSERT OR IGNORE INTO receipt_item_persons (item_id, person_id) VALUES (?, ?)',
+      [itemId, pid]
+    );
+  }
+}
+
+export async function migrateTagsToPersons(tagIds) {
+  const db = await getDB();
+  if (!tagIds || tagIds.length === 0) return { migrated: 0 };
+  let migrated = 0;
+  for (const tagId of tagIds) {
+    const tag = await db.getFirstAsync('SELECT * FROM tags WHERE id = ?', [tagId]);
+    if (!tag) continue;
+    const existing = await db.getFirstAsync(
+      'SELECT id FROM persons WHERE name = ? COLLATE NOCASE',
+      [tag.name]
+    );
+    let personId;
+    if (existing) {
+      personId = existing.id;
+    } else {
+      const res = await db.runAsync(
+        'INSERT INTO persons (name, color, is_self) VALUES (?, ?, 0)',
+        [tag.name, tag.color]
+      );
+      personId = res.lastInsertRowId;
+    }
+    const links = await db.getAllAsync(
+      'SELECT receipt_id FROM receipt_tags WHERE tag_id = ?',
+      [tagId]
+    );
+    for (const l of links) {
+      await db.runAsync(
+        'INSERT OR IGNORE INTO receipt_persons (receipt_id, person_id) VALUES (?, ?)',
+        [l.receipt_id, personId]
+      );
+    }
+    await db.runAsync('DELETE FROM tags WHERE id = ?', [tagId]);
+    migrated += 1;
+  }
+  return { migrated };
+}
+
+export async function hasItemLevelSplit(receiptId) {
+  const db = await getDB();
+  const row = await db.getFirstAsync(
+    `SELECT COUNT(*) AS count
+     FROM receipt_item_persons rip
+     JOIN receipt_items ri ON ri.id = rip.item_id
+     WHERE ri.receipt_id = ?`,
+    [receiptId]
+  );
+  return (row?.count || 0) > 0;
+}
+
 // --- Stats ---
 
 export async function statsTotal() {
@@ -389,6 +594,116 @@ export async function statsMonthly() {
     GROUP BY month
     ORDER BY month ASC
   `);
+}
+
+export async function getTripPersonTotals(tripId) {
+  const db = await getDB();
+  const fromReceipts = await db.getAllAsync(
+    `SELECT p.id, p.name, p.color, p.is_self,
+       SUM(COALESCE(r.total_sek, r.total, 0) * 1.0 / pc.cnt) AS total,
+       SUM(CASE WHEN pc.cnt > 1 THEN COALESCE(r.total_sek, r.total, 0) * 1.0 / pc.cnt ELSE 0 END) AS shared,
+       COUNT(DISTINCT r.id) AS receipt_count
+     FROM receipts r
+     JOIN receipt_persons rp ON rp.receipt_id = r.id
+     JOIN persons p ON p.id = rp.person_id
+     JOIN (SELECT receipt_id, COUNT(*) AS cnt FROM receipt_persons GROUP BY receipt_id) pc
+       ON pc.receipt_id = r.id
+     WHERE r.trip_id = ?
+       AND r.id NOT IN (
+         SELECT DISTINCT ri.receipt_id
+         FROM receipt_items ri
+         JOIN receipt_item_persons rip ON rip.item_id = ri.id
+       )
+     GROUP BY p.id`,
+    [tripId]
+  );
+  const fromItems = await db.getAllAsync(
+    `SELECT p.id, p.name, p.color, p.is_self,
+       SUM(COALESCE(ri.price, 0) * 1.0 / ipc.cnt) AS total,
+       COUNT(DISTINCT ri.receipt_id) AS receipt_count
+     FROM receipt_items ri
+     JOIN receipt_item_persons rip ON rip.item_id = ri.id
+     JOIN persons p ON p.id = rip.person_id
+     JOIN (SELECT item_id, COUNT(*) AS cnt FROM receipt_item_persons GROUP BY item_id) ipc
+       ON ipc.item_id = ri.id
+     JOIN receipts r ON r.id = ri.receipt_id
+     WHERE r.trip_id = ?
+     GROUP BY p.id`,
+    [tripId]
+  );
+  const map = new Map();
+  for (const row of fromReceipts) {
+    map.set(row.id, { ...row, total: row.total || 0, shared: row.shared || 0 });
+  }
+  for (const row of fromItems) {
+    const existing = map.get(row.id);
+    if (existing) {
+      existing.total = (existing.total || 0) + (row.total || 0);
+      existing.receipt_count = existing.receipt_count + row.receipt_count;
+    } else {
+      map.set(row.id, { ...row, total: row.total || 0, shared: 0 });
+    }
+  }
+  return [...map.values()].sort((a, b) => (b.total || 0) - (a.total || 0));
+}
+
+export async function getReceiptsByTripAndPerson(tripId, personId) {
+  const db = await getDB();
+  return db.getAllAsync(
+    `SELECT r.* FROM receipts r
+     JOIN receipt_persons rp ON rp.receipt_id = r.id
+     WHERE r.trip_id = ? AND rp.person_id = ?
+     ORDER BY COALESCE(r.purchased_at, r.created_at) ASC`,
+    [tripId, personId]
+  );
+}
+
+export async function statsTopPersons(limit = 5) {
+  const db = await getDB();
+  const fromReceipts = await db.getAllAsync(
+    `SELECT p.id, p.name, p.color, p.is_self,
+       SUM(COALESCE(r.total_sek, r.total, 0) * 1.0 / pc.cnt) AS total,
+       COUNT(DISTINCT r.id) AS receipt_count
+     FROM receipts r
+     JOIN receipt_persons rp ON rp.receipt_id = r.id
+     JOIN persons p ON p.id = rp.person_id
+     JOIN (SELECT receipt_id, COUNT(*) AS cnt FROM receipt_persons GROUP BY receipt_id) pc
+       ON pc.receipt_id = r.id
+     WHERE r.id NOT IN (
+       SELECT DISTINCT ri.receipt_id
+       FROM receipt_items ri
+       JOIN receipt_item_persons rip ON rip.item_id = ri.id
+     )
+     GROUP BY p.id`
+  );
+  const fromItems = await db.getAllAsync(
+    `SELECT p.id, p.name, p.color, p.is_self,
+       SUM(COALESCE(ri.price, 0) * COALESCE(r.fx_rate, 1) * 1.0 / ipc.cnt) AS total,
+       COUNT(DISTINCT ri.receipt_id) AS receipt_count
+     FROM receipt_items ri
+     JOIN receipt_item_persons rip ON rip.item_id = ri.id
+     JOIN persons p ON p.id = rip.person_id
+     JOIN (SELECT item_id, COUNT(*) AS cnt FROM receipt_item_persons GROUP BY item_id) ipc
+       ON ipc.item_id = ri.id
+     JOIN receipts r ON r.id = ri.receipt_id
+     GROUP BY p.id`
+  );
+  const map = new Map();
+  for (const row of fromReceipts) {
+    map.set(row.id, { ...row, total: row.total || 0 });
+  }
+  for (const row of fromItems) {
+    const existing = map.get(row.id);
+    if (existing) {
+      existing.total = (existing.total || 0) + (row.total || 0);
+      existing.receipt_count = existing.receipt_count + row.receipt_count;
+    } else {
+      map.set(row.id, { ...row, total: row.total || 0 });
+    }
+  }
+  return [...map.values()]
+    .sort((a, b) => (b.total || 0) - (a.total || 0))
+    .slice(0, limit);
 }
 
 export async function statsTopTags(limit = 5) {

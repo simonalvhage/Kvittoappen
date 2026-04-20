@@ -146,8 +146,8 @@ export default function ScanScreen() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       router.replace({
-        pathname: '/tags/pick',
-        params: { receiptId: String(receiptId), next: `/receipt/${receiptId}` },
+        pathname: `/receipt/${receiptId}/people`,
+        params: { next: `/receipt/${receiptId}` },
       });
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});

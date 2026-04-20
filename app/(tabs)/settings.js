@@ -121,11 +121,25 @@ export default function SettingsScreen() {
         )}
       </ListSection>
 
-      <ListSection title="Taggar">
+      <ListSection title="Personer">
         <ListRow
-          title="Hantera taggar"
-          subtitle="Skapa och ta bort taggar för personer och kategorier"
+          title="Hantera personer"
+          subtitle="Du och de du delar kvitton med"
+          onPress={() => router.push('/persons/manage')}
+        />
+      </ListSection>
+
+      <ListSection title="Kategorier">
+        <ListRow
+          title="Hantera kategorier"
+          subtitle="Mat, kläder, nöje och annat"
           onPress={() => router.push('/tags/manage')}
+        />
+        <Separator />
+        <ListRow
+          title="Migrera taggar till personer"
+          subtitle="Flytta befintliga taggar som egentligen är personer"
+          onPress={() => router.push('/migrate-v2')}
         />
       </ListSection>
 

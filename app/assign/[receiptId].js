@@ -43,7 +43,6 @@ export default function AssignScreen() {
     const [ts, r] = await Promise.all([listTrips(), getReceipt(receiptId)]);
     setTrips(ts);
     setReceipt(r);
-    if (r?.trip_id) setSelectedTripId(r.trip_id);
     if (r?.trip_day) setSelectedDay(r.trip_day);
   }, [receiptId]);
 

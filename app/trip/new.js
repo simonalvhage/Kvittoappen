@@ -99,6 +99,9 @@ export default function NewTripScreen() {
             <Pressable
               key={e}
               onPress={() => { setEmoji(e); Haptics.selectionAsync().catch(() => {}); }}
+              accessibilityLabel={`Välj emoji ${e}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: emoji === e }}
               style={[
                 styles.emojiChoice,
                 { backgroundColor: emoji === e ? c.accent + '22' : c.bg, borderColor: emoji === e ? c.accent : 'transparent' },

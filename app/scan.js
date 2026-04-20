@@ -170,6 +170,8 @@ export default function ScanScreen() {
           <View style={styles.topBar}>
             <Pressable
               onPress={() => router.back()}
+              accessibilityLabel="Stäng kamera"
+              accessibilityRole="button"
               style={({ pressed }) => [styles.closeBtn, { opacity: pressed ? 0.6 : 1 }]}
             >
               <Ionicons name="close" size={26} color="#fff" />
@@ -185,6 +187,8 @@ export default function ScanScreen() {
             <Text style={styles.hint}>Rikta kameran mot kvittot</Text>
             <Pressable
               onPress={takePhoto}
+              accessibilityLabel="Ta foto"
+              accessibilityRole="button"
               style={({ pressed }) => [styles.shutterOuter, { opacity: pressed ? 0.7 : 1 }]}
             >
               <View style={styles.shutterInner} />
@@ -200,6 +204,8 @@ export default function ScanScreen() {
           <View style={styles.topBar}>
             <Pressable
               onPress={retake}
+              accessibilityLabel="Ta om foto"
+              accessibilityRole="button"
               style={({ pressed }) => [styles.closeBtn, { opacity: pressed ? 0.6 : 1 }]}
             >
               <Ionicons name="arrow-back" size={24} color="#fff" />

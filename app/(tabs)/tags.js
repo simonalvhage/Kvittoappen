@@ -63,7 +63,13 @@ export default function TagsScreen() {
   useEffect(() => {
     nav.setOptions({
       headerRight: () => (
-        <Pressable onPress={addTag} hitSlop={10} style={{ paddingHorizontal: spacing.md }}>
+        <Pressable
+          onPress={addTag}
+          accessibilityLabel="Ny tagg"
+          accessibilityRole="button"
+          hitSlop={10}
+          style={{ paddingHorizontal: spacing.md }}
+        >
           <Ionicons name="add" size={28} color={c.accent} />
         </Pressable>
       ),
@@ -92,6 +98,8 @@ export default function TagsScreen() {
   const renderRightActions = (tag) => () => (
     <Pressable
       onPress={() => confirmDelete(tag)}
+      accessibilityLabel={`Ta bort tagg ${tag.name}`}
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.swipeDelete,
         { backgroundColor: c.danger, opacity: pressed ? 0.85 : 1 },

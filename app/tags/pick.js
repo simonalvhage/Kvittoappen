@@ -104,6 +104,9 @@ export default function TagPickScreen() {
               <Pressable
                 key={t.id}
                 onPress={() => toggle(t)}
+                accessibilityRole="button"
+                accessibilityLabel={`Tagg ${t.name}`}
+                accessibilityState={{ selected: isOn }}
                 style={({ pressed }) => [
                   styles.chip,
                   {

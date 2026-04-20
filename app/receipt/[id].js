@@ -83,6 +83,8 @@ export default function ReceiptDetail() {
           headerRight: () => (
             <Pressable
               onPress={onDelete}
+              accessibilityLabel="Ta bort kvitto"
+              accessibilityRole="button"
               hitSlop={8}
               style={styles.headerBtn}
             >
@@ -171,6 +173,8 @@ export default function ReceiptDetail() {
             <Pressable
               onPress={() => changeSplit(splitCount - 1)}
               disabled={splitCount <= 1}
+              accessibilityLabel="Minska antal personer"
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.splitBtn,
                 { backgroundColor: c.bg, opacity: splitCount <= 1 ? 0.3 : pressed ? 0.6 : 1 },
@@ -186,6 +190,8 @@ export default function ReceiptDetail() {
             </View>
             <Pressable
               onPress={() => changeSplit(splitCount + 1)}
+              accessibilityLabel="Öka antal personer"
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.splitBtn,
                 { backgroundColor: c.bg, opacity: pressed ? 0.6 : 1 },

@@ -113,6 +113,8 @@ export default function TripDetail() {
           headerRight: () => (
             <Pressable
               onPress={onDelete}
+              accessibilityLabel="Ta bort resa"
+              accessibilityRole="button"
               hitSlop={8}
               style={styles.headerBtn}
             >
@@ -225,6 +227,8 @@ export default function TripDetail() {
 
       <Pressable
         onPress={openScan}
+        accessibilityLabel="Skanna nytt kvitto"
+        accessibilityRole="button"
         style={({ pressed }) => [
           styles.fab,
           shadow.floating,

@@ -133,6 +133,8 @@ export default function InboxScreen() {
   const renderRightActions = (id) => () => (
     <Pressable
       onPress={() => deleteOne(id)}
+      accessibilityLabel="Ta bort kvitto"
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.swipeDelete,
         { backgroundColor: c.danger, opacity: pressed ? 0.85 : 1 },
@@ -241,6 +243,8 @@ export default function InboxScreen() {
       {!selectMode && receipts.length > 0 ? (
         <Pressable
           onPress={openScan}
+          accessibilityLabel="Skanna nytt kvitto"
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.fab,
             shadow.floating,
@@ -266,6 +270,8 @@ export default function InboxScreen() {
           <Pressable
             onPress={bulkDelete}
             disabled={selected.size === 0}
+            accessibilityLabel={`Ta bort ${selected.size} valda kvitton`}
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.dangerBtn,
               {

@@ -92,6 +92,8 @@ export default function TripsScreen() {
       {trips.length > 0 ? (
         <Pressable
           onPress={() => router.push('/trip/new')}
+          accessibilityLabel="Skapa ny resa"
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.fab,
             shadow.floating,

@@ -31,7 +31,16 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
 .env*.local
+
+# Claude Code local state
+.claude/
+
+# EAS / Expo credentials
+credentials.json
+*.keystore
 
 # typescript
 *.tsbuildinfo

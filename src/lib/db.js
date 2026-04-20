@@ -367,6 +367,48 @@ export async function getTripTagTotals(tripId) {
   return { tags, untagged: untaggedRow?.total || 0 };
 }
 
+export async function statsOverall() {
+  const db = await getDB();
+  const r = await db.getFirstAsync(`
+    SELECT
+      (SELECT COUNT(*) FROM receipts) AS receipt_count,
+      (SELECT COUNT(*) FROM trips) AS trip_count,
+      (SELECT COALESCE(SUM(COALESCE(total_sek, total, 0)), 0) FROM receipts) AS total
+  `);
+  return r || { receipt_count: 0, trip_count: 0, total: 0 };
+}
+
+export async function statsMonthly() {
+  const db = await getDB();
+  return db.getAllAsync(`
+    SELECT strftime('%Y-%m', COALESCE(purchased_at, created_at)) AS month,
+      SUM(COALESCE(total_sek, total, 0)) AS total,
+      COUNT(*) AS count
+    FROM receipts
+    WHERE COALESCE(purchased_at, created_at) >= date('now', '-12 months')
+    GROUP BY month
+    ORDER BY month ASC
+  `);
+}
+
+export async function statsTopTags(limit = 5) {
+  const db = await getDB();
+  return db.getAllAsync(
+    `SELECT t.id, t.name, t.color,
+       SUM(COALESCE(r.total_sek, r.total, 0) * 1.0 / tc.cnt) AS total,
+       COUNT(DISTINCT r.id) AS receipt_count
+     FROM receipts r
+     JOIN receipt_tags rt ON rt.receipt_id = r.id
+     JOIN tags t ON t.id = rt.tag_id
+     JOIN (SELECT receipt_id, COUNT(*) AS cnt FROM receipt_tags GROUP BY receipt_id) tc
+       ON tc.receipt_id = r.id
+     GROUP BY t.id
+     ORDER BY total DESC
+     LIMIT ?`,
+    [limit]
+  );
+}
+
 export async function statsByStore() {
   const db = await getDB();
   return db.getAllAsync(`

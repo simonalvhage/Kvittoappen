@@ -70,6 +70,10 @@ export default function RootLayout() {
             name="assign/bulk"
             options={{ title: 'Lägg till i resa', presentation: 'modal' }}
           />
+          <Stack.Screen
+            name="tags/pick"
+            options={{ title: 'Taggar' }}
+          />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

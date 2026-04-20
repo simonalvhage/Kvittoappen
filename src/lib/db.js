@@ -57,7 +57,34 @@ async function migrate(db) {
     CREATE INDEX IF NOT EXISTS idx_receipts_trip ON receipts(trip_id);
     CREATE INDEX IF NOT EXISTS idx_receipts_purchased ON receipts(purchased_at);
     CREATE INDEX IF NOT EXISTS idx_items_receipt ON receipt_items(receipt_id);
+
+    CREATE TABLE IF NOT EXISTS tags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      color TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS receipt_tags (
+      receipt_id INTEGER NOT NULL,
+      tag_id INTEGER NOT NULL,
+      PRIMARY KEY (receipt_id, tag_id),
+      FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE,
+      FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_receipt_tags_receipt ON receipt_tags(receipt_id);
+    CREATE INDEX IF NOT EXISTS idx_receipt_tags_tag ON receipt_tags(tag_id);
   `);
+}
+
+export const TAG_COLORS = [
+  '#FF3B30', '#FF9500', '#FFCC00', '#34C759', '#30C0C6', '#32ADE6',
+  '#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#A2845E', '#8E8E93',
+];
+
+function pickTagColor(index) {
+  return TAG_COLORS[index % TAG_COLORS.length];
 }
 
 // --- Trips ---
@@ -198,6 +225,63 @@ export async function deleteReceipt(id) {
   await db.runAsync('DELETE FROM receipts WHERE id = ?', [id]);
 }
 
+// --- Tags ---
+
+export async function listTags() {
+  const db = await getDB();
+  return db.getAllAsync('SELECT * FROM tags ORDER BY name COLLATE NOCASE ASC');
+}
+
+export async function createTag(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) throw new Error('Tag-namn saknas');
+  const db = await getDB();
+  const existing = await db.getFirstAsync(
+    'SELECT * FROM tags WHERE name = ? COLLATE NOCASE',
+    [trimmed]
+  );
+  if (existing) return existing;
+  const { count } = await db.getFirstAsync('SELECT COUNT(*) AS count FROM tags');
+  const color = pickTagColor(count);
+  const res = await db.runAsync(
+    'INSERT INTO tags (name, color) VALUES (?, ?)',
+    [trimmed, color]
+  );
+  return { id: res.lastInsertRowId, name: trimmed, color };
+}
+
+export async function deleteTag(id) {
+  const db = await getDB();
+  await db.runAsync('DELETE FROM tags WHERE id = ?', [id]);
+}
+
+export async function getReceiptTags(receiptId) {
+  const db = await getDB();
+  return db.getAllAsync(
+    `SELECT t.* FROM tags t
+     JOIN receipt_tags rt ON rt.tag_id = t.id
+     WHERE rt.receipt_id = ?
+     ORDER BY t.name COLLATE NOCASE ASC`,
+    [receiptId]
+  );
+}
+
+export async function addTagToReceipt(receiptId, tagId) {
+  const db = await getDB();
+  await db.runAsync(
+    'INSERT OR IGNORE INTO receipt_tags (receipt_id, tag_id) VALUES (?, ?)',
+    [receiptId, tagId]
+  );
+}
+
+export async function removeTagFromReceipt(receiptId, tagId) {
+  const db = await getDB();
+  await db.runAsync(
+    'DELETE FROM receipt_tags WHERE receipt_id = ? AND tag_id = ?',
+    [receiptId, tagId]
+  );
+}
+
 // --- Stats ---
 
 export async function statsTotal() {
@@ -208,6 +292,31 @@ export async function statsTotal() {
       COALESCE(SUM(COALESCE(total_sek, total)), 0) AS total_sek
     FROM receipts
   `);
+}
+
+export async function getTripTagTotals(tripId) {
+  const db = await getDB();
+  const tags = await db.getAllAsync(
+    `SELECT t.id, t.name, t.color,
+       SUM(COALESCE(r.total_sek, r.total, 0) * 1.0 / tc.cnt) AS total
+     FROM receipts r
+     JOIN receipt_tags rt ON rt.receipt_id = r.id
+     JOIN tags t ON t.id = rt.tag_id
+     JOIN (SELECT receipt_id, COUNT(*) AS cnt FROM receipt_tags GROUP BY receipt_id) tc
+       ON tc.receipt_id = r.id
+     WHERE r.trip_id = ?
+     GROUP BY t.id
+     ORDER BY total DESC`,
+    [tripId]
+  );
+  const untaggedRow = await db.getFirstAsync(
+    `SELECT COALESCE(SUM(COALESCE(total_sek, total, 0)), 0) AS total
+     FROM receipts
+     WHERE trip_id = ?
+       AND id NOT IN (SELECT receipt_id FROM receipt_tags)`,
+    [tripId]
+  );
+  return { tags, untagged: untaggedRow?.total || 0 };
 }
 
 export async function statsByStore() {

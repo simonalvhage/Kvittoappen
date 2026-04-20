@@ -7,6 +7,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      initialRouteName="trips"
       screenOptions={{
         tabBarActiveTintColor: c.accent,
         tabBarInactiveTintColor: c.textSecondary,
@@ -21,6 +22,13 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
+        name="trips"
+        options={{
+          title: 'Resor',
+          tabBarIcon: ({ color, size }) => <Ionicons name="airplane-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: 'Kvitton',
@@ -29,17 +37,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="trips"
+        name="tags"
         options={{
-          title: 'Resor',
-          tabBarIcon: ({ color, size }) => <Ionicons name="airplane-outline" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="stats"
-        options={{
-          title: 'Statistik',
-          tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart-outline" color={color} size={size} />,
+          title: 'Taggar',
+          tabBarIcon: ({ color, size }) => <Ionicons name="pricetag-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen

@@ -5,9 +5,10 @@ import {
 import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/hooks/useTheme';
 import { spacing, font, radius, shadow } from '../../src/lib/theme';
-import { getTrip, listReceiptsByTrip, deleteTrip } from '../../src/lib/db';
+import { getTrip, listReceiptsByTrip, deleteTrip, getTripTagTotals } from '../../src/lib/db';
 import { formatSEK } from '../../src/lib/fx';
 import { EmptyState } from '../../src/components/EmptyState';
 
@@ -36,17 +37,23 @@ function prettyDay(iso) {
 export default function TripDetail() {
   const { c } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
 
   const [trip, setTrip] = useState(null);
   const [receipts, setReceipts] = useState([]);
+  const [tagTotals, setTagTotals] = useState({ tags: [], untagged: 0 });
 
   const load = useCallback(async () => {
     const t = await getTrip(id);
     setTrip(t);
     if (t) {
-      const rs = await listReceiptsByTrip(id);
+      const [rs, tt] = await Promise.all([
+        listReceiptsByTrip(id),
+        getTripTagTotals(id),
+      ]);
       setReceipts(rs);
+      setTagTotals(tt);
     }
   }, [id]);
 
@@ -78,6 +85,11 @@ export default function TripDetail() {
 
   const displayDays = days.length > 0 ? days : Array.from(groups.keys()).sort();
 
+  const openScan = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    router.push({ pathname: '/scan', params: { tripId: String(id) } });
+  };
+
   const onDelete = () => {
     Alert.alert('Ta bort resa?', 'Kvitton i resan flyttas tillbaka till inboxen.', [
       { text: 'Avbryt', style: 'cancel' },
@@ -94,7 +106,7 @@ export default function TripDetail() {
   };
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Stack.Screen
         options={{
           title: '',
@@ -109,7 +121,7 @@ export default function TripDetail() {
           ),
         }}
       />
-      <ScrollView style={{ flex: 1, backgroundColor: c.bg }} contentContainerStyle={styles.content}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 96 }]}>
         <View style={[styles.hero, { backgroundColor: c.card }, shadow.card]}>
           <Text style={styles.emoji}>{trip.emoji || '✈️'}</Text>
           <Text style={[font.title1, { color: c.text, marginTop: spacing.sm }]}>{trip.name}</Text>
@@ -140,6 +152,39 @@ export default function TripDetail() {
               title="Inga kvitton än"
               message="Skanna ett kvitto och lägg till det här från inboxen."
             />
+          </View>
+        ) : null}
+
+        {tagTotals.tags.length > 0 || tagTotals.untagged > 0 ? (
+          <View style={{ marginTop: spacing.lg }}>
+            <Text style={[styles.dayHeader, { color: c.textSecondary }]}>PER TAGG</Text>
+            <View style={[styles.card, { backgroundColor: c.card, padding: spacing.lg, gap: spacing.md }]}>
+              {(() => {
+                const rows = [
+                  ...tagTotals.tags.map((t) => ({ key: `t-${t.id}`, name: t.name, color: t.color, total: t.total })),
+                  ...(tagTotals.untagged > 0
+                    ? [{ key: 'untagged', name: 'Otaggat', color: c.textTertiary, total: tagTotals.untagged }]
+                    : []),
+                ];
+                const max = Math.max(...rows.map((r) => r.total), 1);
+                return rows.map((r) => (
+                  <View key={r.key} style={{ gap: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: r.color }} />
+                      <Text style={[font.body, { color: c.text, flex: 1 }]} numberOfLines={1}>{r.name}</Text>
+                      <Text style={[font.body, { color: c.text, fontWeight: '600' }]}>{formatSEK(r.total)}</Text>
+                    </View>
+                    <View style={{ height: 4, borderRadius: 2, backgroundColor: c.separator, overflow: 'hidden' }}>
+                      <View style={{
+                        height: '100%',
+                        width: `${Math.round((r.total / max) * 100)}%`,
+                        backgroundColor: r.color,
+                      }} />
+                    </View>
+                  </View>
+                ));
+              })()}
+            </View>
           </View>
         ) : null}
 
@@ -177,7 +222,18 @@ export default function TripDetail() {
           </View>
         ) : null}
       </ScrollView>
-    </>
+
+      <Pressable
+        onPress={openScan}
+        style={({ pressed }) => [
+          styles.fab,
+          shadow.floating,
+          { backgroundColor: c.accent, opacity: pressed ? 0.85 : 1, bottom: insets.bottom + spacing.lg },
+        ]}
+      >
+        <Ionicons name="scan" size={26} color="#fff" />
+      </Pressable>
+    </View>
   );
 }
 
@@ -213,7 +269,13 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
   },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  content: { padding: spacing.lg },
+  fab: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 60, height: 60, borderRadius: 30,
+    alignItems: 'center', justifyContent: 'center',
+  },
   hero: {
     borderRadius: radius.lg,
     padding: spacing.xl,

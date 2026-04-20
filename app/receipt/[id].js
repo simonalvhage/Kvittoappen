@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../src/hooks/useTheme';
 import { spacing, font, radius } from '../../src/lib/theme';
 import {
-  getReceipt, getReceiptItems, setReceiptSplit, deleteReceipt, getTrip,
+  getReceipt, getReceiptItems, setReceiptSplit, deleteReceipt, getTrip, getReceiptTags,
 } from '../../src/lib/db';
 import { formatSEK, formatMoney } from '../../src/lib/fx';
 
@@ -20,6 +20,7 @@ export default function ReceiptDetail() {
   const [receipt, setReceipt] = useState(null);
   const [items, setItems] = useState([]);
   const [trip, setTrip] = useState(null);
+  const [tags, setTags] = useState([]);
   const [splitCount, setSplitCount] = useState(1);
 
   const load = useCallback(async () => {
@@ -27,8 +28,9 @@ export default function ReceiptDetail() {
     if (!r) return;
     setReceipt(r);
     setSplitCount(r.split_count || 1);
-    const its = await getReceiptItems(id);
+    const [its, ts] = await Promise.all([getReceiptItems(id), getReceiptTags(id)]);
     setItems(its);
+    setTags(ts);
     if (r.trip_id) {
       const t = await getTrip(r.trip_id);
       setTrip(t);
@@ -130,6 +132,35 @@ export default function ReceiptDetail() {
                 {receipt.trip_day}
               </Text>
             ) : null}
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push({ pathname: '/tags/pick', params: { receiptId: String(id) } })}
+          style={({ pressed }) => [
+            styles.card, styles.tripRow,
+            { backgroundColor: c.card, opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Ionicons name="pricetag-outline" size={20} color={c.accent} />
+          <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {tags.length === 0 ? (
+              <Text style={[font.body, { color: c.text, fontWeight: '600' }]}>
+                Lägg till taggar
+              </Text>
+            ) : (
+              tags.map((t) => (
+                <View
+                  key={t.id}
+                  style={[styles.tagChip, { backgroundColor: t.color }]}
+                >
+                  <Text style={[font.footnote, { color: '#fff', fontWeight: '600' }]}>
+                    {t.name}
+                  </Text>
+                </View>
+              ))
+            )}
           </View>
           <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
         </Pressable>
@@ -260,5 +291,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
     gap: spacing.md, alignItems: 'flex-start',
+  },
+  tagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
   },
 });

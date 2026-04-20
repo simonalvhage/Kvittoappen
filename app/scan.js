@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, Image, Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -14,7 +14,7 @@ import { Button } from '../src/components/Button';
 import { getApiKey } from '../src/lib/secureStore';
 import { parseReceiptImage } from '../src/lib/openai';
 import { getRateToSEK } from '../src/lib/fx';
-import { createReceiptFromParsed } from '../src/lib/db';
+import { createReceiptFromParsed, assignReceipt, getTrip } from '../src/lib/db';
 
 const STAGES = {
   CAMERA: 'camera',
@@ -25,6 +25,8 @@ const STAGES = {
 export default function ScanScreen() {
   const { c } = useTheme();
   const router = useRouter();
+  const { tripId: tripIdParam } = useLocalSearchParams();
+  const tripId = tripIdParam ? Number(tripIdParam) : null;
   const cameraRef = useRef(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [stage, setStage] = useState(STAGES.CAMERA);
@@ -127,8 +129,26 @@ export default function ScanScreen() {
         totalSek,
       });
 
+      if (tripId) {
+        let tripDay = null;
+        try {
+          const trip = await getTrip(tripId);
+          if (trip && parsed.date) {
+            const start = trip.start_date;
+            const end = trip.end_date || trip.start_date;
+            if (start && parsed.date >= start && parsed.date <= end) {
+              tripDay = parsed.date;
+            }
+          }
+        } catch {}
+        await assignReceipt(receiptId, { tripId, tripDay });
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      router.replace(`/receipt/${receiptId}`);
+      router.replace({
+        pathname: '/tags/pick',
+        params: { receiptId: String(receiptId), next: `/receipt/${receiptId}` },
+      });
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Alert.alert('Kunde inte tolka kvittot', String(e?.message || e), [

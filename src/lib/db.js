@@ -300,11 +300,53 @@ export async function statsTotal() {
   `);
 }
 
+export async function getTripDailyTotals(tripId) {
+  const db = await getDB();
+  return db.getAllAsync(
+    `SELECT COALESCE(trip_day, purchased_at) AS day,
+       SUM(COALESCE(total_sek, total, 0)) AS total,
+       COUNT(*) AS count
+     FROM receipts
+     WHERE trip_id = ? AND COALESCE(trip_day, purchased_at) IS NOT NULL
+     GROUP BY COALESCE(trip_day, purchased_at)
+     ORDER BY day ASC`,
+    [tripId]
+  );
+}
+
+export async function getTripStoreStats(tripId) {
+  const db = await getDB();
+  return db.getAllAsync(
+    `SELECT COALESCE(store, 'Okänd butik') AS store,
+       COUNT(*) AS visit_count,
+       SUM(COALESCE(total_sek, total, 0)) AS total,
+       AVG(COALESCE(total_sek, total, 0)) AS avg
+     FROM receipts
+     WHERE trip_id = ?
+     GROUP BY COALESCE(store, 'Okänd butik')
+     ORDER BY total DESC`,
+    [tripId]
+  );
+}
+
+export async function getReceiptsByTripAndTag(tripId, tagId) {
+  const db = await getDB();
+  return db.getAllAsync(
+    `SELECT r.* FROM receipts r
+     JOIN receipt_tags rt ON rt.receipt_id = r.id
+     WHERE r.trip_id = ? AND rt.tag_id = ?
+     ORDER BY COALESCE(r.purchased_at, r.created_at) ASC`,
+    [tripId, tagId]
+  );
+}
+
 export async function getTripTagTotals(tripId) {
   const db = await getDB();
   const tags = await db.getAllAsync(
     `SELECT t.id, t.name, t.color,
-       SUM(COALESCE(r.total_sek, r.total, 0) * 1.0 / tc.cnt) AS total
+       SUM(COALESCE(r.total_sek, r.total, 0) * 1.0 / tc.cnt) AS total,
+       SUM(CASE WHEN tc.cnt > 1 THEN COALESCE(r.total_sek, r.total, 0) * 1.0 / tc.cnt ELSE 0 END) AS shared,
+       COUNT(DISTINCT r.id) AS receipt_count
      FROM receipts r
      JOIN receipt_tags rt ON rt.receipt_id = r.id
      JOIN tags t ON t.id = rt.tag_id

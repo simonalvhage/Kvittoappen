@@ -63,6 +63,10 @@ export default function RootLayout() {
             options={{ title: '', headerBackTitle: 'Resor' }}
           />
           <Stack.Screen
+            name="trip/[id]/tag/[tagId]"
+            options={{ title: '', headerBackTitle: 'Tillbaka' }}
+          />
+          <Stack.Screen
             name="assign/[receiptId]"
             options={{ title: 'Lägg till i resa', presentation: 'modal' }}
           />
